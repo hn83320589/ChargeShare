@@ -1,5 +1,6 @@
 """管委會與住戶的網頁路由。"""
 
+import hmac
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
@@ -78,7 +79,9 @@ def admin_login_form(request: Request):
 @router.post("/admin/login")
 def admin_login(request: Request, username: str = Form(), password: str = Form()):
     settings = request.app.state.ctx.settings
-    if (username, password) != (settings.admin_username, settings.admin_password):
+    user_ok = hmac.compare_digest(username.encode(), settings.admin_username.encode())
+    password_ok = hmac.compare_digest(password.encode(), settings.admin_password.encode())
+    if not (user_ok and password_ok):
         context = {"role": "admin", "error": "帳號或密碼錯誤"}
         return TEMPLATES.TemplateResponse(request, "login.html", context, status_code=401)
     request.session.clear()

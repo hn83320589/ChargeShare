@@ -78,6 +78,8 @@ async def _every(clock: Clock, interval_s: float, action, name: str) -> None:
 
 def create_app(settings: Settings, clock: Clock) -> FastAPI:
     ctx = build_context(settings, clock)
+    if insecure := settings.insecure_defaults():
+        logger.warning("using insecure development defaults for %s", ", ".join(insecure))
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
