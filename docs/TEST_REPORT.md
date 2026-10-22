@@ -4,9 +4,9 @@
 |---|---|
 | 報告版本 | 第 2 版（含程式碼審查回饋的修正驗證） |
 | 測試日期 | 2026-10-22 |
-| 受測版本 | commit `4031b51` |
+| 受測版本 | commit `2fa2dfa`（測試數 149） |
 | 測試環境 | macOS（Apple Silicon）、Python 3.13.17 與 3.12.15、uv 0.13.5、SQLite；GitHub Actions（ubuntu-latest，3.12 / 3.13） |
-| 結論 | **14 項驗收標準全部通過；審查指出的 3 個問題皆已修正並有測試** |
+| 結論 | **14 項驗收標準全部通過；審查指出的 3 個問題與 CI 發現的 2 個偶發問題皆已修正並有測試** |
 
 ---
 
@@ -14,8 +14,10 @@
 
 | 測試類型 | 結果 |
 |---|---|
-| 自動化測試（Python 3.13，乾淨 clone） | **146 通過 / 0 失敗**，44.3 秒 |
+| 自動化測試（Python 3.13，乾淨 clone） | **146 通過 / 0 失敗**，44.3 秒（之後新增 3 項，共 149） |
 | 自動化測試（Python 3.12，題目最低版本，乾淨 clone） | **146 通過 / 0 失敗**，44.0 秒 |
+| GitHub Actions（Python 3.12 / 3.13，最終版） | **連續 3 次、6 個 job 皆 149 通過** |
+| 端對端穩定性壓力測試（本機 24 份並行，共 96 次） | 全部通過 |
 | 以 pip 安裝（`pip install -e . --group dev`）後執行單元與整合測試 | 通過 |
 | Lint / Format（ruff） | 無警告 |
 | 鎖定相依版本（`uv lock --check`、`uv sync --locked`） | 一致 |
@@ -25,10 +27,10 @@
 
 | 層級 | 數量 | 檔案 |
 |---|---|---|
-| 單元測試（純函數） | 87 | allocation 11、demand 9、dispatch 4、tariff 16、metering 10、billing 5、auth_rules 6、clock 6、ocpp_protocol 6、connections 2、web_helpers 11、simulator_parts 1 |
+| 單元測試（純函數） | 90 | allocation 11、demand 9、dispatch 4、tariff 16、metering 10、billing 5、auth_rules 6、clock 6、ocpp_protocol 6、connections 3、web_helpers 11、simulator_parts 3 |
 | 整合測試（DB / WebSocket / 服務 / CLI） | 55 | ocpp_flow 15、power_manager 11、web 11、billing_service 6、db 5、seed 3、authorization 2、cli 1、sim_recorder 1 |
 | 端對端測試（伺服器 + 8 支模擬樁） | 4 | simulation 4 |
-| **合計** | **146** | |
+| **合計** | **149** | |
 
 ---
 
@@ -49,7 +51,7 @@
 | 11 | 月結帳單金額與手算一致（≥ 2 筆、涵蓋尖峰與離峰） | ✅ | `test_billing_service.py::test_monthly_bill_matches_hand_calculation`：154.70 + 26.95 = 181.65 → 182 元，尖峰 10.5 度、離峰 52.5 度；`test_billing.py::test_bill_total_rounds_sum_half_up_to_yuan` |
 | 12 | 儀表板總功率曲線即時更新，任何時間點都不超過 30 kW 上限線 | ✅ | 實機（第 1 版）：30 分鐘模擬期間每秒輪詢 `/api/power` 共 30 次，即時點 30 個皆不同；曲線所有點中實際功率最大 29.53 kW、已分配上限（含保留）最大 30.00 kW。本版 30 分鐘模擬：模擬器量測的真實瞬間功率峰值 29.62 kW。自動化：`test_power_manager.py`（以「10 秒內新舊值皆可能生效」計算最壞情況總和 ≤ 30 kW）、`test_web.py::test_power_api_returns_last_hour_with_capacity`、`test_seed.py`。曲線採 monotone 插值，畫面不會因平滑過衝而穿過上限線 |
 | 13 | 模擬器 8 支樁 30 分鐘（可加速），伺服器無錯誤，事後比對每筆度數一致 | ✅ | 實機：在乾淨 clone 中執行 `chargeshare simulate --dev --scenario all --minutes 30 --speed 60`，8 筆充電度數與伺服器完全一致，log 中 ERROR 0 筆，exit code 0。自動化：端對端 `test_fleet_of_eight_for_thirty_minutes`（120 倍速，同時驗證無 ERROR 記錄、峰值 ≤ 30 kW） |
-| 14 | 測試至少 35 個，`pytest` 全數通過 | ✅ | 146 個，Python 3.12 與 3.13 皆全數通過，GitHub Actions 亦通過 |
+| 14 | 測試至少 35 個，`pytest` 全數通過 | ✅ | 149 個，Python 3.12 與 3.13 皆全數通過，GitHub Actions 連續 3 次通過 |
 
 ---
 
@@ -90,6 +92,17 @@
 |---|---|---|
 | 啟動時間前 1 分鐘才開始的範例充電沒有中間讀數，批次寫入空串列導致範例資料產生失敗 | 實機以不同時間啟動時發生（原測試固定在 21:30 而未觸發） | 空串列時不寫入；加回歸測試（修正前失敗、修正後通過） |
 
+### 3.5 推上 GitHub 後由 CI 發現的偶發問題
+
+本機連續多輪皆通過，但 GitHub Actions 的機器較慢，暴露出兩個時序問題。兩者都先寫測試重現，再修正。
+
+| 問題 | 現象 | 修正 |
+|---|---|---|
+| 連線在 `send()` 途中中斷時，已登記的等待 future 被設為例外卻沒人讀取 | asyncio 記錄 ERROR「Future exception was never retrieved」，e2e 測試（不允許任何 ERROR）失敗。**伺服器的 `ChargerConnection.call` 也有同樣問題** | 模擬器與伺服器都在 `finally` 移除並讀取自己的 future；`test_simulator_parts.py`、`test_connections.py` 各 1 項 |
+| 模擬器故障時間以「模擬開始」計算 | 120 倍速下 CI 較慢，CP04 第 6.6 分鐘才開始充電，第 5 分鐘的重開機發生在充電前，`reboots == 0` | 故障改為從「開始充電」起算，保證發生在充電途中；`test_simulator_parts.py` 1 項 |
+
+修正後 GitHub Actions 連續 3 次（6 個 job）通過；本機另以 24 份 e2e 並行（共 96 次）驗證。
+
 ---
 
 ## 4. 交付物檢查
@@ -109,7 +122,7 @@
 | 範例資料產生腳本 | ✅ | `src/chargeshare/seed.py`（`chargeshare serve` 首次啟動時執行） |
 | 費率設定檔 | ✅ | `config/tariff.toml` |
 | 2026 年國定假日資料 | ✅ | `config/holidays_2026.toml`（依人事行政總處 115 年辦公日曆表，含補假；104 個週末 + 16 個平日假日 = 120 天，與官方公布總數相符） |
-| pytest 測試 | ✅ | `tests/`（146 個） |
+| pytest 測試 | ✅ | `tests/`（149 個） |
 | 加分項：GitHub Actions CI | ✅ | `.github/workflows/ci.yml`（Python 3.12 / 3.13 矩陣：ruff + pytest），README 有 CI badge |
 | 授權 | ✅ | `LICENSE`（MIT） |
 
@@ -169,5 +182,5 @@ CP08 tx 663：1.822 度（重開機 0 次、斷線 0 次、電表重置 0 次）
 - **測試警告 1 則**：Starlette 提示 TestClient 未來改用 `httpx2` 套件。屬於上游的棄用提示，不影響功能；更換套件需另行決定。
 - **「排隊中」狀態**：實體只有 8 支樁，8 × 1.4 kW < 30 kW，正常運作不會排隊，所以只以純函數與服務層測試驗證（驗收 5 本身即要求以純函數測試）。
 - **電表重置的電量缺口**：重置前最後一筆讀數到實際歸零之間的電量（最多 1 分鐘，且重開機期間不供電）伺服器無從得知，不計入；這類交易會標記給管委會確認。
-- **時序相關的端對端測試**在 120 倍速下執行；本機與 CI 皆穩定通過。若 CI 機器負載過高，可降低倍速。
+- **時序相關的端對端測試**在 120 倍速下執行；修正 3.5 的兩個問題後，本機壓力測試與 CI 連續 3 次皆穩定通過。
 - 其餘系統限制見 README「已知限制」。
