@@ -6,9 +6,17 @@ from chargeshare.domain.allocation import PowerConfig
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-# 僅供本機展示；正式部署請以環境變數覆寫
+# 僅供本機展示；必須明確以 --dev 啟動才允許使用
 DEFAULT_ADMIN_PASSWORD = "admin"
-DEFAULT_SECRET_KEY = "dev-only-change-me"
+
+
+class InsecureConfiguration(RuntimeError):
+    pass
+
+
+def _env(name: str, default: str | None = None):
+    # 建立 Settings 時才讀取環境變數，而不是 import 時
+    return field(default_factory=lambda: os.environ.get(name, default))
 
 
 @dataclass(frozen=True)
@@ -19,14 +27,21 @@ class Settings:
     snapshot_interval_s: int = 30
     power: PowerConfig = field(default_factory=PowerConfig)
     admin_username: str = "admin"
-    admin_password: str = os.environ.get("CHARGESHARE_ADMIN_PASSWORD", DEFAULT_ADMIN_PASSWORD)
-    secret_key: str = os.environ.get("CHARGESHARE_SECRET_KEY", DEFAULT_SECRET_KEY)
+    admin_password: str = _env("CHARGESHARE_ADMIN_PASSWORD", DEFAULT_ADMIN_PASSWORD)
+    # 未設定時於首次啟動自動產生隨機金鑰，存在資料庫旁的 secret_key 檔
+    secret_key: str | None = _env("CHARGESHARE_SECRET_KEY")
+    dev_mode: bool = False
 
-    def insecure_defaults(self) -> list[str]:
-        """仍使用開發用預設值的設定（正式部署前必須以環境變數覆寫）。"""
-        found = []
-        if self.admin_password == DEFAULT_ADMIN_PASSWORD:
-            found.append("CHARGESHARE_ADMIN_PASSWORD")
-        if self.secret_key == DEFAULT_SECRET_KEY:
-            found.append("CHARGESHARE_SECRET_KEY")
-        return found
+    @property
+    def secret_key_path(self) -> Path:
+        if self.database_url.startswith("sqlite:///"):
+            return Path(self.database_url.removeprefix("sqlite:///")).parent / "secret_key"
+        return PROJECT_ROOT / "data" / "secret_key"
+
+    def ensure_secure(self) -> None:
+        """管理員密碼仍是公開的預設值時拒絕啟動，除非明確以開發模式執行。"""
+        if self.admin_password == DEFAULT_ADMIN_PASSWORD and not self.dev_mode:
+            raise InsecureConfiguration(
+                "管理員密碼仍是預設值。請設定環境變數 CHARGESHARE_ADMIN_PASSWORD，"
+                "或在本機展示時加上 --dev。"
+            )

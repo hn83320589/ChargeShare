@@ -22,6 +22,7 @@ from chargeshare.domain.tariff import Tariff
 from chargeshare.ocpp import endpoint
 from chargeshare.ocpp.connections import ConnectionManager
 from chargeshare.ocpp.router import ChargePointRouter
+from chargeshare.security import load_or_create_secret_key
 from chargeshare.services.billing import ensure_monthly_bills
 from chargeshare.services.power_manager import PowerManager
 from chargeshare.settings import Settings
@@ -78,8 +79,10 @@ async def _every(clock: Clock, interval_s: float, action, name: str) -> None:
 
 def create_app(settings: Settings, clock: Clock) -> FastAPI:
     ctx = build_context(settings, clock)
-    if insecure := settings.insecure_defaults():
-        logger.warning("using insecure development defaults for %s", ", ".join(insecure))
+    settings.ensure_secure()
+    if settings.dev_mode:
+        logger.warning("開發模式：管理員密碼使用公開的預設值，請勿對外提供服務")
+    secret_key = settings.secret_key or load_or_create_secret_key(settings.secret_key_path)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -119,7 +122,7 @@ def create_app(settings: Settings, clock: Clock) -> FastAPI:
 
     app = FastAPI(title="ChargeShare", lifespan=lifespan)
     app.state.ctx = ctx
-    app.add_middleware(SessionMiddleware, secret_key=settings.secret_key, same_site="lax")
+    app.add_middleware(SessionMiddleware, secret_key=secret_key, same_site="lax")
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     app.include_router(endpoint.router)
     app.include_router(web_routes.router)

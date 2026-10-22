@@ -16,7 +16,7 @@ NOW = datetime(2026, 10, 23, 22, 0, tzinfo=TAIPEI)  # 週五
 
 @pytest.fixture
 def app(tmp_path):
-    settings = Settings(database_url=f"sqlite:///{tmp_path / 'app.db'}")
+    settings = Settings(database_url=f"sqlite:///{tmp_path / 'app.db'}", dev_mode=True)
     app = create_app(settings, FakeClock(NOW))
     return app
 

@@ -33,7 +33,7 @@ async def live_server(tmp_path) -> AsyncIterator[tuple]:
         seed_base(session, hasher=lambda password: "unused")
     engine.dispose()
     clock = ScaledClock(SIM_START, speed=SPEED)
-    app = create_app(Settings(database_url=url), clock)
+    app = create_app(Settings(database_url=url, dev_mode=True), clock)
     async with serving(app) as port:
         yield app, clock, f"ws://127.0.0.1:{port}/ocpp"
 

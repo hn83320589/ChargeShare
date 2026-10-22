@@ -175,3 +175,17 @@ def test_bill_detail_marks_meter_reset(client, app):
         ).one().meter_resets = 1
     login_resident(client)
     assert "電表重置" in client.get(f"/me/bills/{bill_id(app, 'A01-01')}").text
+
+
+def test_forged_admin_cookie_signed_with_public_string_is_rejected(client):
+    # 審查回饋：舊版預設金鑰 "dev-only-change-me" 公開在 repo 中，可偽造管委會 session
+    import base64
+    import json
+
+    from itsdangerous import TimestampSigner
+
+    payload = base64.b64encode(json.dumps({"admin": True}).encode())
+    forged = TimestampSigner("dev-only-change-me").sign(payload).decode()
+    client.cookies.set("session", forged)
+    response = client.get("/admin", follow_redirects=False)
+    assert response.status_code == 303

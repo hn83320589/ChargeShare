@@ -21,7 +21,7 @@ from chargeshare.db.migrate import upgrade_to_head
 from chargeshare.db.session import create_db_engine, make_session_factory
 from chargeshare.runner import serving
 from chargeshare.seed import seed_all
-from chargeshare.settings import Settings
+from chargeshare.settings import InsecureConfiguration, Settings
 from chargeshare.simulator.fleet import FleetResult, run_fleet
 from chargeshare.simulator.recorder import load_sessions, verify
 from chargeshare.simulator.scenarios import SCENARIOS, FleetOptions
@@ -34,7 +34,11 @@ def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     logging.basicConfig(level=logging.INFO, format=LOG_FORMAT)
     logging.getLogger("websockets").setLevel(logging.WARNING)
-    return args.handler(args)
+    try:
+        return args.handler(args)
+    except InsecureConfiguration as exc:
+        logger.error("%s", exc)
+        return 2
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -46,6 +50,7 @@ def _parser() -> argparse.ArgumentParser:
     serve.add_argument("--port", type=int, default=8000)
     serve.add_argument("--db", default=None, help="SQLite 檔案路徑（預設 data/chargeshare.db）")
     serve.add_argument("--no-seed", action="store_true", help="不建立範例資料")
+    _add_dev_arg(serve)
     _add_clock_args(serve)
     serve.set_defaults(handler=_serve)
 
@@ -53,6 +58,7 @@ def _parser() -> argparse.ArgumentParser:
     simulate.add_argument("--port", type=int, default=8000)
     simulate.add_argument("--db", default=None)
     simulate.add_argument("--no-seed", action="store_true")
+    _add_dev_arg(simulate)
     _add_fleet_args(simulate)
     _add_clock_args(simulate, default_speed=60)
     simulate.set_defaults(handler=_simulate)
@@ -68,6 +74,14 @@ def _parser() -> argparse.ArgumentParser:
     check.add_argument("--db", required=True)
     check.set_defaults(handler=_verify)
     return parser
+
+
+def _add_dev_arg(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--dev",
+        action="store_true",
+        help="開發模式：允許管理員使用預設密碼 admin（僅限本機展示）",
+    )
 
 
 def _add_clock_args(parser: argparse.ArgumentParser, default_speed: float = 1) -> None:
@@ -96,9 +110,12 @@ def _clock(args) -> Clock:
 
 
 def _settings(args) -> Settings:
+    dev = getattr(args, "dev", False)
     if args.db:
-        return Settings(database_url=f"sqlite:///{Path(args.db).resolve()}")
-    settings = Settings()
+        settings = Settings(database_url=f"sqlite:///{Path(args.db).resolve()}", dev_mode=dev)
+    else:
+        settings = Settings(dev_mode=dev)
+    settings.ensure_secure()
     Path(settings.database_url.removeprefix("sqlite:///")).parent.mkdir(exist_ok=True)
     return settings
 

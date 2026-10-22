@@ -31,13 +31,31 @@ def test_charger_view_formats_kw():
     assert (view.limit_kw, view.power_kw) == ("3.75", "3.61")
 
 
-def test_settings_report_insecure_defaults():
+def test_secret_key_is_generated_once_and_kept_private(tmp_path):
+    import stat
+
+    from chargeshare.security import load_or_create_secret_key
+
+    path = tmp_path / "data" / "secret_key"
+    first = load_or_create_secret_key(path)
+    assert len(first) >= 43  # 32 bytes 以上的亂數
+    assert load_or_create_secret_key(path) == first  # 重啟後沿用，既有 session 不失效
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+    assert load_or_create_secret_key(tmp_path / "other") != first
+
+
+def test_default_admin_password_requires_dev_mode(tmp_path):
+    from chargeshare.settings import InsecureConfiguration, Settings
+
+    db = f"sqlite:///{tmp_path / 'x.db'}"
+    with pytest.raises(InsecureConfiguration, match="--dev"):
+        Settings(database_url=db, admin_password="admin").ensure_secure()
+    Settings(database_url=db, admin_password="admin", dev_mode=True).ensure_secure()
+    Settings(database_url=db, admin_password="a-strong-one").ensure_secure()
+
+
+def test_secret_key_file_lives_next_to_database(tmp_path):
     from chargeshare.settings import Settings
 
-    assert Settings(
-        admin_password="admin", secret_key="dev-only-change-me"
-    ).insecure_defaults() == [
-        "CHARGESHARE_ADMIN_PASSWORD",
-        "CHARGESHARE_SECRET_KEY",
-    ]
-    assert Settings(admin_password="x9!", secret_key="k" * 32).insecure_defaults() == []
+    settings = Settings(database_url=f"sqlite:///{tmp_path / 'db' / 'x.db'}")
+    assert settings.secret_key_path == tmp_path / "db" / "secret_key"

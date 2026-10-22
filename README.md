@@ -17,20 +17,27 @@ ChargeShare 透過簡化版 OCPP 1.6J 控制每支樁的功率上限，確保總
 
 ```bash
 uv sync                      # 依 uv.lock 安裝鎖定版本的相依套件
-uv run chargeshare serve     # 啟動伺服器；首次啟動自動建立範例資料
+uv run chargeshare serve --dev   # 本機展示：啟動伺服器，首次啟動自動建立範例資料
 ```
 
 | 頁面 | 網址 | 範例帳號 |
 |---|---|---|
-| 管委會儀表板 | http://127.0.0.1:8000/admin | `admin` / `admin` |
+| 管委會儀表板 | http://127.0.0.1:8000/admin | `admin` / `admin`（`--dev`）或你設定的密碼 |
 | 住戶登入 | http://127.0.0.1:8000/login | 戶號 `01-01` / 密碼 `pw-01-01`（每戶為 `pw-<戶號>`） |
 | 充電樁 WebSocket | `ws://127.0.0.1:8000/ocpp/{charger_id}` | `CP01` … `CP08`，子協定 `ocpp1.6` |
 
 首次啟動會建立 `data/chargeshare.db`，內容為 120 戶（`01-01` … `15-08`）、每戶 1–2 張卡、8 支樁、
 **過去 2 個月**的充電紀錄（以實際分配演算法逐分鐘模擬產生）與已結算的月結帳單。
 
-> ⚠️ 管理員密碼與 session 金鑰的預設值僅供本機展示。正式部署請設定
-> `CHARGESHARE_ADMIN_PASSWORD` 與 `CHARGESHARE_SECRET_KEY`；使用預設值時伺服器啟動會記錄 WARNING。
+> ⚠️ **`--dev` 只供本機展示**：允許管理員使用公開的預設密碼 `admin`。沒有加 `--dev` 時，
+> 必須先設定 `CHARGESHARE_ADMIN_PASSWORD`，否則伺服器拒絕啟動：
+>
+> ```bash
+> CHARGESHARE_ADMIN_PASSWORD='請換成強密碼' uv run chargeshare serve
+> ```
+>
+> Session 金鑰不需要設定：首次啟動會自動產生隨機金鑰，存到資料庫旁的 `data/secret_key`（權限 0600），
+> 重啟後沿用。若有多台主機要共用，可改用 `CHARGESHARE_SECRET_KEY` 指定。
 
 範例資料中刻意保留的授權示範：
 
@@ -45,8 +52,8 @@ uv run chargeshare serve     # 啟動伺服器；首次啟動自動建立範例�
 ### 指令一覽
 
 ```bash
-uv run chargeshare serve [--port 8000] [--db PATH] [--no-seed] [--speed N --start ISO]
-uv run chargeshare simulate [--scenario all] [--minutes 30] [--speed 60] [--port 8000]
+uv run chargeshare serve [--dev] [--port 8000] [--db PATH] [--no-seed] [--speed N --start ISO]
+uv run chargeshare simulate [--dev] [--scenario all] [--minutes 30] [--speed 60] [--port 8000]
 uv run chargeshare sim --url ws://127.0.0.1:8000/ocpp [--scenario …] [--minutes …] [--log …]
 uv run chargeshare verify --log sim-logs/latest.jsonl --db data/chargeshare.db
 uv run pytest                # 全部測試（約 40 秒，含 3 個端對端模擬）
@@ -70,7 +77,7 @@ uv run pytest                # 全部測試（約 40 秒，含 3 個端對端模
 **一個指令完成加速模擬與比對**（伺服器與模擬器在同一個行程、共用加速時鐘）：
 
 ```bash
-uv run chargeshare simulate --minutes 30 --speed 60
+uv run chargeshare simulate --dev --minutes 30 --speed 60
 # 模擬期間可開 http://127.0.0.1:8000/admin 觀看；結束後輸出：
 #   CP04 tx 651：1.890 度（重開機 1 次、斷線 0 次）
 #   模擬期間實際總功率峰值：29.69 kW
@@ -80,7 +87,7 @@ uv run chargeshare simulate --minutes 30 --speed 60
 **連到另一個行程的伺服器**（真實時間）：
 
 ```bash
-uv run chargeshare serve                          # 終端機 1
+uv run chargeshare serve --dev                    # 終端機 1
 uv run chargeshare sim --minutes 30 --log sim-logs/run.jsonl   # 終端機 2
 uv run chargeshare verify --log sim-logs/run.jsonl --db data/chargeshare.db
 ```
