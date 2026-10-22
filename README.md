@@ -12,6 +12,7 @@ ChargeShare 透過簡化版 OCPP 1.6J 控制每支樁的功率上限，確保總
 - 前端：Jinja2 + HTMX + Chart.js（皆隨專案提供，離線可用）
 - 所有時間邏輯透過可注入的 `Clock`（系統時鐘 / 測試用假時鐘 / 加速時鐘）
 - 設計文件：[docs/DESIGN.md](docs/DESIGN.md)　測試報告：[docs/TEST_REPORT.md](docs/TEST_REPORT.md)
+- 📘 **教學文件**：[從需求到程式的系統設計實戰](docs/tutorial/README.md)（11 章：需求分析、系統分析、架構、技術選型、資料模型、通訊可靠性、核心演算法、時間與並行、測試策略、除錯案例、練習題）
 
 ---
 
@@ -404,7 +405,7 @@ uv run ruff check . && uv run ruff format --check .
 
 ```text
 config/                 tariff.toml、holidays_2026.toml
-docs/                   DESIGN.md、TEST_REPORT.md、screenshots/、images/
+docs/                   DESIGN.md、TEST_REPORT.md、tutorial/（教學文件）、screenshots/、images/
 scripts/                two_phase_chart.py（產生「先降後升」對照圖）
 src/chargeshare/
   clock.py              Clock 介面與 System / Fake / Scaled 實作
