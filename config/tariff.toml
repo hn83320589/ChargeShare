@@ -1,0 +1,17 @@
+# 二段式時間電價（金額單位：新台幣元/度）
+# 週六、週日與國定假日（見 holidays_2026.toml）全日為離峰。
+management_fee_per_kwh = "0.5"
+
+[summer]
+# 夏月期間（含首尾），格式 MM-DD
+start = "06-01"
+end = "09-30"
+peak_rate = "5.0"
+offpeak_rate = "2.0"
+# 平日尖峰時段，[開始, 結束)，24:00 代表午夜
+weekday_peak_hours = [["09:00", "24:00"]]
+
+[non_summer]
+peak_rate = "4.8"
+offpeak_rate = "1.9"
+weekday_peak_hours = [["06:00", "11:00"], ["14:00", "24:00"]]
