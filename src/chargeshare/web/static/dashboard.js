@@ -9,7 +9,7 @@
     type: "line",
     data: { labels: [], datasets: [
       { label: "實際總功率", data: [], borderColor: "#2563eb", backgroundColor: "rgba(37,99,235,.12)",
-        fill: true, tension: 0.2, pointRadius: 0 },
+        fill: true, cubicInterpolationMode: "monotone", pointRadius: 0 },
       { label: "已分配上限（含保留）", data: [], borderColor: "#d97706", stepped: true, pointRadius: 0, borderWidth: 1.5 },
       { label: "契約上限", data: [], borderColor: "#dc2626", borderDash: [6, 4], pointRadius: 0, borderWidth: 2 },
     ] },

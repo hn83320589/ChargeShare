@@ -8,3 +8,4 @@ dist/
 data/*.db
 data/*.db-*
 sim-logs/
+/.playwright-mcp/

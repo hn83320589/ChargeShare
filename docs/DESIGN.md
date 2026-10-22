@@ -1,6 +1,6 @@
 # ChargeShare 系統分析與架構設計（草案 v0.1）
 
-> 狀態：討論中，尚未開始開發。第 9 節「待決策事項」確認後才動工。
+> 狀態：已確認並實作完成（決策見第 9 節）。實作細節與使用方式見 README。
 
 ---
 
@@ -63,7 +63,6 @@ ChargeShare/
 ├── config/
 │   ├── tariff.toml            # 費率、季節、尖離峰時段、管理費
 │   ├── holidays_2026.toml     # 2026 國定假日
-│   └── settings.toml          # 30kW、heartbeat、admin 帳密等
 ├── src/chargeshare/
 │   ├── clock.py               # Clock protocol + System/Fake/Scaled
 │   ├── domain/                # allocation, demand, tariff, metering, billing, auth_rules
@@ -101,6 +100,7 @@ bills           id, household_id, period('2026-09'), issued_at,
                 peak_wh, offpeak_wh, total_amount(元, 整數), paid_at(nullable)
                 UNIQUE(household_id, period)        ← 月結冪等
 power_snapshots ts, measured_w, limit_w, reserved_w  ← 儀表板曲線
+billing_runs    period(PK), ran_at                   ← 每期只結算一次
 ```
 
 ---
@@ -111,7 +111,7 @@ power_snapshots ts, measured_w, limit_w, reserved_w  ← 儀表板曲線
 
 ```python
 def allocate(chargers: list[ChargerState], capacity_w=30_000,
-             min_w=1_400, max_w=7_000, step_w=100) -> Allocation
+             min_w=1_400, max_w=7_000, step_w=50) -> Allocation
 # ChargerState: id, online, has_session, arrived_at, demand_cap_w, last_limit_w
 # Allocation:   limits: dict[id, W], queued: list[id], reserved_w
 ```
@@ -123,11 +123,11 @@ def allocate(chargers: list[ChargerState], capacity_w=30_000,
    - 22 支 → `floor(30/1.4) = 21`，第 22 支排隊（驗收 5）。有人結束，下一次重算自然由排第一的補上。
    - 已在供電者不會被後到者搶走（不搶佔）。
 3. **注水法（water-filling）分配**：每支有自己的上限 `cap_i`（一般為 7 kW；快充滿者為其需求值，見 4.3），找一個水位 `L` 使 `Σ min(cap_i, L) = budget`，每支 `clamp(min(cap_i, L), 1.4, 7)`。
-4. **量化**：結果**向下**取整到 100 W，保證總和 ≤ 30 kW。
+4. **量化**：共同水位一次**向下**取整到 50 W（3.75 kW、1.4 kW 皆可整除），保證總和 ≤ 30 kW。
 
 驗算：
 - 8 支都很餓：30/8 = 3.75 kW ✔（驗收 3）
-- 2 支降到 0.8 kW：它們 cap = max(1.4, 0.8+0.5) = 1.4；其餘 6 支分 (30 − 2.8)/6 = 4.53 → 4.5 kW；總和 29.8 kW ✔（驗收 4）
+- 2 支降到 0.8 kW：它們 cap = 0.8+0.5 → 以 0.5 kW 級距向上取 = 1.5；其餘 6 支分 (30 − 3)/6 = 4.5 kW；總和 30 kW ✔（驗收 4）
 
 ### 4.3 需求偵測與防振盪（hysteresis）
 
@@ -198,7 +198,7 @@ def allocate(chargers: list[ChargerState], capacity_w=30_000,
 
 ### 5.4 月結帳單
 
-- 每月 1 日（Scheduler 每小時檢查一次，冪等）產生上月帳單。
+- 每月 1 日（Scheduler 每小時檢查一次）產生上月帳單；`billing_runs` 確保每期只結算一次。
 - **歸屬規則**：帳單 P 包含「已結束、尚未入帳、stop_ts < P 月底」的所有交易。若某筆交易因斷線晚到，自動併入下一期，不會遺漏也不會重複。
 - 跨月充電歸屬於**結束時間**所在月份。
 
