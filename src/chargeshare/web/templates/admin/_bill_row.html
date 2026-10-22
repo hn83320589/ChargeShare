@@ -1,0 +1,14 @@
+<tr id="bill-{{ bill.id }}">
+  <td><a href="/admin/bills/{{ bill.id }}">{{ bill.household.unit_no }}</a></td>
+  <td class="num">{{ bill.peak_wh | kwh }}</td>
+  <td class="num">{{ bill.offpeak_wh | kwh }}</td>
+  <td class="num">{{ "{:,}".format(bill.total_amount) }}</td>
+  <td>{% if bill.paid_at %}<span class="pill paid">已繳</span>{% else %}<span class="pill unpaid">未繳</span>{% endif %}</td>
+  <td>
+    <button class="small secondary" hx-post="/admin/bills/{{ bill.id }}/paid"
+            hx-vals='{"paid": "{{ "false" if bill.paid_at else "true" }}"}'
+            hx-target="#bill-{{ bill.id }}" hx-swap="outerHTML">
+      {{ "取消已繳" if bill.paid_at else "標記已繳" }}
+    </button>
+  </td>
+</tr>

@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}ChargeShare{% endblock %} · 社區充電管理</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/vendor/htmx.min.js" defer></script>
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">⚡ ChargeShare</a>
+    <nav>{% block nav %}{% endblock %}</nav>
+  </header>
+  <main>{% block content %}{% endblock %}</main>
+</body>
+</html>

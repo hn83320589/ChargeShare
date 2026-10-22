@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}帳單{% endblock %}
+{% block nav %}<a href="/admin">儀表板</a><a href="/admin/bills" class="active">帳單</a><a href="/logout">登出</a>{% endblock %}
+{% block content %}
+<div class="card-head">
+  <h1>{{ period or "尚無" }} 帳單</h1>
+  <form method="get">
+    <select name="period" onchange="this.form.submit()">
+      {% for p in periods %}<option value="{{ p }}" {% if p == period %}selected{% endif %}>{{ p }}</option>{% endfor %}
+    </select>
+  </form>
+</div>
+<section class="card">
+  <table>
+    <thead><tr><th>戶號</th><th class="num">尖峰度數</th><th class="num">離峰度數</th><th class="num">金額（元）</th><th>狀態</th><th></th></tr></thead>
+    <tbody>
+      {% for bill in bills %}{% include "admin/_bill_row.html" %}{% else %}
+      <tr><td colspan="6" class="muted">本期沒有帳單</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

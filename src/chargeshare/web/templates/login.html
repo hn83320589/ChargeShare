@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ "管委會登入" if role == "admin" else "住戶登入" }}{% endblock %}
+{% block content %}
+<section class="card login">
+  <h1>{{ "管委會登入" if role == "admin" else "住戶登入" }}</h1>
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+  {% if role == "admin" %}
+  <form method="post" action="/admin/login">
+    <label>帳號 <input name="username" autocomplete="username" required></label>
+    <label>密碼 <input name="password" type="password" autocomplete="current-password" required></label>
+    <button type="submit">登入</button>
+  </form>
+  <p class="muted"><a href="/login">住戶登入</a></p>
+  {% else %}
+  <form method="post" action="/login">
+    <label>戶號 <input name="unit_no" value="{{ unit_no or '' }}" placeholder="例如 A03-02" required></label>
+    <label>密碼 <input name="password" type="password" autocomplete="current-password" required></label>
+    <button type="submit">登入</button>
+  </form>
+  <p class="muted"><a href="/admin/login">管委會登入</a></p>
+  {% endif %}
+</section>
+{% endblock %}

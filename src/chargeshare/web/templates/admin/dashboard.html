@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}儀表板{% endblock %}
+{% block head %}<script src="/static/vendor/chart.umd.min.js" defer></script>
+<script src="/static/dashboard.js" defer></script>{% endblock %}
+{% block nav %}<a href="/admin" class="active">儀表板</a><a href="/admin/bills">帳單</a><a href="/logout">登出</a>{% endblock %}
+{% block content %}
+<h1>充電樁狀態</h1>
+<div id="chargers" hx-get="/admin/chargers" hx-trigger="every 5s" hx-swap="innerHTML">
+  {% include "admin/_chargers.html" %}
+</div>
+<section class="card">
+  <div class="card-head">
+    <h2>最近 1 小時總功率</h2>
+    <span class="muted">上限 {{ capacity_kw }} kW · 每 5 秒更新</span>
+  </div>
+  <div class="chart-box"><canvas id="power-chart"></canvas></div>
+</section>
+{% endblock %}

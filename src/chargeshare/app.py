@@ -5,10 +5,13 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import Engine, update
 from sqlalchemy.orm import Session, sessionmaker
+from starlette.middleware.sessions import SessionMiddleware
 
 from chargeshare.clock import Clock
 from chargeshare.config import load_tariff
@@ -22,8 +25,11 @@ from chargeshare.ocpp.router import ChargePointRouter
 from chargeshare.services.billing import ensure_monthly_bills
 from chargeshare.services.power_manager import PowerManager
 from chargeshare.settings import Settings
+from chargeshare.web import routes as web_routes
 
 logger = logging.getLogger(__name__)
+
+STATIC_DIR = Path(__file__).parent / "web" / "static"
 
 
 @dataclass
@@ -111,5 +117,8 @@ def create_app(settings: Settings, clock: Clock) -> FastAPI:
 
     app = FastAPI(title="ChargeShare", lifespan=lifespan)
     app.state.ctx = ctx
+    app.add_middleware(SessionMiddleware, secret_key=settings.secret_key, same_site="lax")
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     app.include_router(endpoint.router)
+    app.include_router(web_routes.router)
     return app

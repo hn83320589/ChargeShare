@@ -1,0 +1,18 @@
+<div class="grid">
+  {% for c in chargers %}
+  <article class="charger status-{{ c.status }}">
+    <header><strong>{{ c.charger_id }}</strong><span class="badge">{{ c.status }}</span></header>
+    <dl>
+      <dt>分配上限</dt><dd>{{ c.limit_kw }} kW</dd>
+      <dt>實際功率</dt><dd>{{ c.power_kw }} kW</dd>
+      {% if c.reserved_w %}<dt>保留額度</dt><dd>{{ c.reserved_kw }} kW</dd>{% endif %}
+    </dl>
+    {% if c.reserved_w %}
+    <form method="post" action="/admin/chargers/{{ c.charger_id }}/release"
+          onsubmit="return confirm('確認 {{ c.charger_id }} 已停止供電，釋放保留額度？')">
+      <button class="small secondary">手動釋放額度</button>
+    </form>
+    {% endif %}
+  </article>
+  {% endfor %}
+</div>

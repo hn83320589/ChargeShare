@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}我的充電{% endblock %}
+{% block nav %}<span class="muted">戶號 {{ household.unit_no }}</span><a href="/logout">登出</a>{% endblock %}
+{% block content %}
+<h1>{{ household.unit_no }} 的充電紀錄</h1>
+<section class="card">
+  <h2>帳單</h2>
+  <table>
+    <thead><tr><th>期別</th><th class="num">尖峰度數</th><th class="num">離峰度數</th><th class="num">金額（元）</th><th>狀態</th><th></th></tr></thead>
+    <tbody>
+      {% for bill in bills %}
+      <tr>
+        <td>{{ bill.period }}</td><td class="num">{{ bill.peak_wh | kwh }}</td><td class="num">{{ bill.offpeak_wh | kwh }}</td>
+        <td class="num">{{ "{:,}".format(bill.total_amount) }}</td>
+        <td>{% if bill.paid_at %}<span class="pill paid">已繳</span>{% else %}<span class="pill unpaid">未繳</span>{% endif %}</td>
+        <td><a href="/me/bills/{{ bill.id }}">明細</a></td>
+      </tr>
+      {% else %}<tr><td colspan="6" class="muted">尚無帳單</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</section>
+<section class="card">
+  <h2>最近充電</h2>
+  <table>
+    <thead><tr><th>開始</th><th>結束</th><th>樁</th><th>卡片</th><th class="num">度數</th><th class="num">尖峰</th><th class="num">離峰</th><th class="num">金額（元）</th></tr></thead>
+    <tbody>
+      {% for tx in transactions %}
+      <tr>
+        <td>{{ tx.start_ts | local_time }}</td>
+        <td>{% if tx.stop_ts %}{{ tx.stop_ts | local_time }}{% else %}<span class="pill charging">充電中</span>{% endif %}</td>
+        <td>{{ tx.charger_id }}</td><td>{{ tx.id_tag }}</td>
+        <td class="num">{{ ((tx.peak_wh or 0) + (tx.offpeak_wh or 0)) | kwh if tx.stop_ts else "—" }}</td>
+        <td class="num">{{ tx.peak_wh | kwh }}</td><td class="num">{{ tx.offpeak_wh | kwh }}</td>
+        <td class="num">{{ tx.amount | money }}</td>
+      </tr>
+      {% else %}<tr><td colspan="8" class="muted">尚無充電紀錄</td></tr>{% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

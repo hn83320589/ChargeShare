@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}{{ bill.period }} 帳單{% endblock %}
+{% block nav %}<a href="{{ back }}">返回</a><a href="/logout">登出</a>{% endblock %}
+{% block content %}
+<section class="card">
+  <div class="card-head">
+    <h1>{{ bill.household.unit_no }} · {{ bill.period }} 充電帳單</h1>
+    {% if bill.paid_at %}<span class="pill paid">已繳</span>{% else %}<span class="pill unpaid">未繳</span>{% endif %}
+  </div>
+  <p class="muted">開立：{{ bill.issued_at | local_time }}</p>
+  <table>
+    <thead><tr><th>開始</th><th>結束</th><th>樁</th><th class="num">度數</th><th class="num">尖峰</th><th class="num">離峰</th><th class="num">金額（元）</th></tr></thead>
+    <tbody>
+      {% for tx in bill.transactions %}
+      <tr>
+        <td>{{ tx.start_ts | local_time }}</td><td>{{ tx.stop_ts | local_time }}</td><td>{{ tx.charger_id }}</td>
+        <td class="num">{{ (tx.peak_wh + tx.offpeak_wh) | kwh }}</td>
+        <td class="num">{{ tx.peak_wh | kwh }}</td><td class="num">{{ tx.offpeak_wh | kwh }}</td>
+        <td class="num">{{ tx.amount | money }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr><th colspan="3">合計（四捨五入到元）</th>
+        <th class="num">{{ (bill.peak_wh + bill.offpeak_wh) | kwh }}</th>
+        <th class="num">{{ bill.peak_wh | kwh }}</th><th class="num">{{ bill.offpeak_wh | kwh }}</th>
+        <th class="num total">{{ "{:,}".format(bill.total_amount) }}</th></tr>
+    </tfoot>
+  </table>
+  <p class="muted">金額含每度 0.5 元管理費；度數計算到 0.001 度。</p>
+</section>
+{% endblock %}

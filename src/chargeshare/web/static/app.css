@@ -1,0 +1,47 @@
+:root {
+  --bg: #f5f6f8; --surface: #fff; --text: #1d2330; --muted: #6b7280; --border: #e3e6eb;
+  --accent: #2563eb; --ok: #16a34a; --warn: #d97706; --bad: #dc2626; --idle: #9ca3af;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font: 15px/1.6 system-ui, -apple-system, "PingFang TC", "Noto Sans TC", sans-serif;
+       background: var(--bg); color: var(--text); }
+a { color: var(--accent); text-decoration: none; }
+.topbar { display: flex; justify-content: space-between; align-items: center; padding: 12px 24px;
+          background: var(--surface); border-bottom: 1px solid var(--border); }
+.brand { font-weight: 700; color: var(--text); }
+nav { display: flex; gap: 16px; align-items: center; }
+nav a.active { font-weight: 600; color: var(--text); }
+main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 48px; }
+h1 { font-size: 22px; margin: 0 0 16px; } h2 { font-size: 17px; margin: 0 0 12px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+.card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.muted { color: var(--muted); font-size: 13px; }
+.error { color: var(--bad); }
+.login { max-width: 360px; margin: 48px auto; }
+.login form { display: grid; gap: 12px; }
+label { display: grid; gap: 4px; font-size: 14px; }
+input, select { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font: inherit; }
+button { padding: 8px 14px; border: 0; border-radius: 6px; background: var(--accent); color: #fff; font: inherit; cursor: pointer; }
+button.secondary { background: #eef2ff; color: var(--accent); }
+button.small { padding: 4px 10px; font-size: 13px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.charger { background: var(--surface); border: 1px solid var(--border); border-left: 5px solid var(--idle); border-radius: 10px; padding: 12px 14px; }
+.charger header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.charger dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 0 0 8px; font-size: 14px; }
+.charger dt { color: var(--muted); } .charger dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; background: #f3f4f6; }
+.status-可用 { border-left-color: var(--ok); } .status-可用 .badge { background: #dcfce7; color: #166534; }
+.status-充電中 { border-left-color: var(--accent); } .status-充電中 .badge { background: #dbeafe; color: #1e40af; }
+.status-排隊中 { border-left-color: var(--warn); } .status-排隊中 .badge { background: #fef3c7; color: #92400e; }
+.status-斷線 { border-left-color: var(--idle); } .status-斷線 .badge { background: #e5e7eb; color: #374151; }
+.status-故障 { border-left-color: var(--bad); } .status-故障 .badge { background: #fee2e2; color: #991b1b; }
+.chart-box { position: relative; height: 320px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; }
+th { color: var(--muted); font-weight: 600; }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+tfoot th { color: var(--text); } .total { font-size: 16px; }
+.pill { font-size: 12px; padding: 2px 8px; border-radius: 999px; }
+.pill.paid { background: #dcfce7; color: #166534; } .pill.unpaid { background: #fee2e2; color: #991b1b; }
+.pill.charging { background: #dbeafe; color: #1e40af; }
+@media (max-width: 640px) { table { font-size: 13px; } th, td { padding: 6px; } }

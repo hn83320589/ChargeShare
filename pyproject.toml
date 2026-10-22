@@ -44,3 +44,7 @@ exclude = ["*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI 以預設參數宣告相依注入
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Form", "fastapi.Query"]
