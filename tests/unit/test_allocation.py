@@ -2,7 +2,7 @@ import random
 from datetime import timedelta
 
 from chargeshare.domain.allocation import ChargerInput, PowerConfig, allocate
-from tests.unit.conftest import tw
+from tests.conftest import tw
 
 CONFIG = PowerConfig(capacity_w=30_000, min_w=1_400, max_w=7_000, step_w=50)
 T0 = tw(2026, 10, 22, 18, 0)

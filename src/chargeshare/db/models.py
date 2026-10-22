@@ -135,3 +135,12 @@ class PowerSnapshot(Base):
     measured_w: Mapped[int]
     limit_w: Mapped[int]
     reserved_w: Mapped[int]
+
+
+class BillingRun(Base):
+    """每期只結算一次；之後才結束的交易併入下一期。"""
+
+    __tablename__ = "billing_runs"
+
+    period: Mapped[str] = mapped_column(String(7), primary_key=True)
+    ran_at: Mapped[datetime]

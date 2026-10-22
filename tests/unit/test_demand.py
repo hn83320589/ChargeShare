@@ -4,7 +4,7 @@ from datetime import timedelta
 from chargeshare.domain.allocation import ChargerInput, PowerConfig, allocate
 from chargeshare.domain.demand import DemandConfig, DemandMode, DemandState, update_demand
 from chargeshare.domain.dispatch import plan_dispatch
-from tests.unit.conftest import tw
+from tests.conftest import tw
 
 CFG = DemandConfig()
 HUNGRY = DemandState.initial(CFG)

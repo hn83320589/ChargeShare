@@ -19,6 +19,7 @@ from chargeshare.domain.tariff import Tariff
 from chargeshare.ocpp import endpoint
 from chargeshare.ocpp.connections import ConnectionManager
 from chargeshare.ocpp.router import ChargePointRouter
+from chargeshare.services.billing import ensure_monthly_bills
 from chargeshare.services.power_manager import PowerManager
 from chargeshare.settings import Settings
 
@@ -84,8 +85,15 @@ def create_app(settings: Settings, clock: Clock) -> FastAPI:
         async def snapshot() -> None:
             ctx.power.record_snapshot()
 
+        async def monthly_bills() -> None:
+            with ctx.session_factory.begin() as session:
+                ensure_monthly_bills(session, clock.now())
+
+        await monthly_bills()
+
         tasks = [
             asyncio.create_task(_every(clock, settings.snapshot_interval_s, snapshot, "snapshot")),
+            asyncio.create_task(_every(clock, 3600, monthly_bills, "monthly_bills")),
             asyncio.create_task(
                 _every(
                     clock,

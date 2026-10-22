@@ -4,7 +4,7 @@ import pytest
 
 from chargeshare.domain.metering import Reading, split_energy
 from chargeshare.domain.tariff import Band, RatePeriod, Season
-from tests.unit.conftest import tw
+from tests.conftest import tw
 
 
 def constant_power(start: datetime, end: datetime, power_w: int, meter_start: int = 0):

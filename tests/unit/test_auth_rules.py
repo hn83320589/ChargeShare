@@ -1,7 +1,7 @@
 from datetime import date
 
 from chargeshare.domain.auth_rules import AuthStatus, CardInfo, add_months, decide_authorization
-from tests.unit.conftest import tw
+from tests.conftest import tw
 
 NOW = tw(2026, 11, 2, 18, 0)
 

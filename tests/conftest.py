@@ -7,7 +7,7 @@ from chargeshare.clock import TAIPEI
 from chargeshare.config import load_tariff
 from chargeshare.domain.tariff import Tariff
 
-CONFIG_DIR = Path(__file__).resolve().parents[2] / "config"
+CONFIG_DIR = Path(__file__).resolve().parents[1] / "config"
 
 
 @pytest.fixture(scope="session")

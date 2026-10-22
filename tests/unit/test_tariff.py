@@ -4,7 +4,7 @@ from decimal import Decimal
 import pytest
 
 from chargeshare.domain.tariff import Band, HolidayDataMissing, RatePeriod, Season
-from tests.unit.conftest import tw
+from tests.conftest import tw
 
 SUMMER_PEAK = RatePeriod(Season.SUMMER, Band.PEAK)
 SUMMER_OFF = RatePeriod(Season.SUMMER, Band.OFFPEAK)
