@@ -1,0 +1,46 @@
+[project]
+name = "chargeshare"
+version = "0.1.0"
+description = "社區充電樁共享管理平台"
+authors = [
+    { name = "DADA", email = "hn83320589@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.20.1",
+    "fastapi>=0.159.1",
+    "itsdangerous>=2.2.0",
+    "jinja2>=3.1.6",
+    "python-multipart>=0.0.32",
+    "sqlalchemy>=2",
+    "uvicorn[standard]>=0.54.0",
+    "websockets>=17.3",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.5,<0.14.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "ruff>=0.17.1",
+]
+
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.format]
+exclude = ["*.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
