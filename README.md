@@ -7,7 +7,7 @@ ChargeShare 透過簡化版 OCPP 1.6J 控制每支樁的功率上限，確保總
 - Python 3.12+、FastAPI（含 WebSocket）、SQLite + SQLAlchemy 2.x + Alembic
 - 前端：Jinja2 + HTMX + Chart.js（皆隨專案提供，離線可用）
 - 所有時間邏輯透過可注入的 `Clock`（系統時鐘 / 測試用假時鐘 / 加速時鐘）
-- 設計文件：[docs/DESIGN.md](docs/DESIGN.md)
+- 設計文件：[docs/DESIGN.md](docs/DESIGN.md)　測試報告：[docs/TEST_REPORT.md](docs/TEST_REPORT.md)
 
 ---
 
