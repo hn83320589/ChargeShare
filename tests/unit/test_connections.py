@@ -41,3 +41,28 @@ async def test_newer_connection_replaces_old_one():
     assert manager.is_online("CP01")
     assert manager.unregister(new) is True
     assert not manager.is_online("CP01")
+
+
+async def test_call_retrieves_failed_future_when_send_fails(caplog):
+    # 與模擬器同類的競態：送出時連線關閉，mark_closed 已把等待中的 future 設為例外
+    import asyncio
+    import gc
+    import logging
+
+    import pytest
+
+    clock = FakeClock(datetime(2026, 10, 22, 18, 0, tzinfo=TAIPEI))
+    manager = ConnectionManager(clock)
+
+    class ClosingSocket(FakeSocket):
+        async def send_text(self, data: str) -> None:
+            connection.mark_closed()
+            raise ConnectionResetError("socket closed")
+
+    connection = manager.register("CP01", ClosingSocket())
+    caplog.set_level(logging.ERROR, logger="asyncio")
+    with pytest.raises(ConnectionResetError):
+        await connection.call("SetChargingProfile", {"limitW": 1400}, timeout_s=30)
+    await asyncio.sleep(0)
+    gc.collect()
+    assert "never retrieved" not in caplog.text

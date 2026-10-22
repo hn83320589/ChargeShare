@@ -60,6 +60,9 @@ class ChargerConnection:
         finally:
             timer.cancel()
             self._pending.pop(message_id, None)
+            # 送出失敗時 mark_closed 可能已設下例外；在此讀取，避免 asyncio 記錄未讀取的例外
+            if future.done() and not future.cancelled():
+                future.exception()
 
     def resolve(self, frame: CallResult | CallError) -> None:
         future = self._pending.get(frame.message_id)

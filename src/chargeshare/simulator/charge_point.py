@@ -427,6 +427,8 @@ class SimChargePoint:
                     "%s server rejected %s %s", self.charger_id, item.action, item.payload
                 )
                 response = None
+            finally:
+                _release(self._waiting, item.message_id, future)
             self._outbox.popleft()
             if item.reply is not None and not item.reply.done():
                 if response is None:
@@ -451,3 +453,10 @@ class SimChargePoint:
             if ws is not None and self._connected.is_set():
                 with contextlib.suppress(ConnectionClosed):
                     await ws.send(json.dumps([2, uuid.uuid4().hex, "Heartbeat", {}]))
+
+
+def _release(waiting: dict, message_id: str, future: asyncio.Future) -> None:
+    """送出端結束等待時移除自己的 future；若連線迴圈已設下例外而沒人讀取，於此讀取。"""
+    waiting.pop(message_id, None)
+    if future.done() and not future.cancelled():
+        future.exception()
