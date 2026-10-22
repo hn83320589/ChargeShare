@@ -199,3 +199,11 @@ def test_invalid_payload_returns_call_error(client):
     with connect(client) as ws:
         result = FakeChargePoint(ws).call("Authorize", {"wrong": 1})
     assert result["error"] in {"FormationViolation", "TypeConstraintViolation"}
+
+
+def test_server_sends_charging_profile_after_start(client):
+    with connect(client) as ws:
+        cp = FakeChargePoint(ws)
+        start(cp)
+        cp.call("Heartbeat", {})
+    assert ("SetChargingProfile", {"connectorId": 1, "limitW": 7000}) in cp.server_calls

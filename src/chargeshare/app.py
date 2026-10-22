@@ -1,5 +1,7 @@
 """組裝 FastAPI 應用程式。時鐘與設定皆由外部注入。"""
 
+import asyncio
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -17,8 +19,10 @@ from chargeshare.domain.tariff import Tariff
 from chargeshare.ocpp import endpoint
 from chargeshare.ocpp.connections import ConnectionManager
 from chargeshare.ocpp.router import ChargePointRouter
-from chargeshare.services.events import EventSink, NullEventSink
+from chargeshare.services.power_manager import PowerManager
 from chargeshare.settings import Settings
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -29,7 +33,7 @@ class AppContext:
     session_factory: sessionmaker[Session]
     tariff: Tariff
     connections: ConnectionManager
-    events: EventSink
+    power: PowerManager
     router: ChargePointRouter
 
 
@@ -40,19 +44,29 @@ def build_context(settings: Settings, clock: Clock) -> AppContext:
         settings.config_dir / "tariff.toml",
         *sorted(settings.config_dir.glob("holidays_*.toml")),
     )
-    events = NullEventSink()
+    connections = ConnectionManager(clock)
+    power = PowerManager(session_factory, clock, connections, settings.power)
     return AppContext(
         settings=settings,
         clock=clock,
         engine=engine,
         session_factory=session_factory,
         tariff=tariff,
-        connections=ConnectionManager(clock),
-        events=events,
+        connections=connections,
+        power=power,
         router=ChargePointRouter(
-            session_factory, clock, tariff, events, settings.heartbeat_interval_s
+            session_factory, clock, tariff, power, settings.heartbeat_interval_s
         ),
     )
+
+
+async def _every(clock: Clock, interval_s: float, action, name: str) -> None:
+    while True:
+        await clock.sleep(interval_s)
+        try:
+            await action()
+        except Exception:
+            logger.exception("background task %s failed", name)
 
 
 def create_app(settings: Settings, clock: Clock) -> FastAPI:
@@ -64,7 +78,27 @@ def create_app(settings: Settings, clock: Clock) -> FastAPI:
         with ctx.session_factory.begin() as session:
             # 伺服器重啟時所有連線都已中斷
             session.execute(update(Charger).values(connected=False))
+        ctx.power.load()
+        heartbeat_timeout = settings.heartbeat_interval_s * 2
+
+        async def snapshot() -> None:
+            ctx.power.record_snapshot()
+
+        tasks = [
+            asyncio.create_task(_every(clock, settings.snapshot_interval_s, snapshot, "snapshot")),
+            asyncio.create_task(
+                _every(
+                    clock,
+                    settings.heartbeat_interval_s,
+                    lambda: ctx.connections.close_stale(heartbeat_timeout),
+                    "watchdog",
+                )
+            ),
+        ]
         yield
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
         ctx.engine.dispose()
 
     app = FastAPI(title="ChargeShare", lifespan=lifespan)

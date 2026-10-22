@@ -30,6 +30,7 @@ class StatusChanged:
 class SessionStarted:
     charger_id: str
     transaction_id: int
+    started_at: datetime
 
 
 @dataclass(frozen=True)
@@ -59,8 +60,3 @@ Event = (
 
 class EventSink(Protocol):
     def publish(self, event: Event) -> None: ...
-
-
-class NullEventSink:
-    def publish(self, event: Event) -> None:
-        pass

@@ -30,10 +30,11 @@ async def ocpp_socket(websocket: WebSocket, charger_id: str) -> None:
     await websocket.accept(subprotocol=SUBPROTOCOL if SUBPROTOCOL in offered else None)
     connection = ctx.connections.register(charger_id, websocket)
     _set_connected(ctx, charger_id, True)
-    ctx.events.publish(ChargerConnected(charger_id))
+    ctx.power.publish(ChargerConnected(charger_id))
     try:
         while True:
             text = await websocket.receive_text()
+            connection.touch()
             reply = _handle_text(ctx, charger_id, connection, text)
             if reply is not None:
                 await connection.send(reply)
@@ -42,7 +43,7 @@ async def ocpp_socket(websocket: WebSocket, charger_id: str) -> None:
     finally:
         if ctx.connections.unregister(connection):
             _set_connected(ctx, charger_id, False)
-            ctx.events.publish(ChargerDisconnected(charger_id))
+            ctx.power.publish(ChargerDisconnected(charger_id))
 
 
 def _handle_text(ctx, charger_id: str, connection, text: str) -> str | None:

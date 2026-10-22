@@ -1,11 +1,15 @@
 """目前在線的充電樁連線，以及伺服器主動送出的 CALL。"""
 
 import asyncio
+import logging
 import uuid
+from datetime import timedelta
 from typing import Any, Protocol
 
 from chargeshare.clock import Clock
 from chargeshare.ocpp.protocol import Call, CallError, CallResult
+
+logger = logging.getLogger(__name__)
 
 
 class TextSocket(Protocol):
@@ -29,6 +33,13 @@ class ChargerConnection:
         self._clock = clock
         self._pending: dict[str, asyncio.Future[dict[str, Any]]] = {}
         self.closed = False
+        self.last_seen = clock.now()
+
+    def touch(self) -> None:
+        self.last_seen = self._clock.now()
+
+    async def close(self) -> None:
+        await self._socket.close(code=1001)
 
     async def send(self, text: str) -> None:
         await self._socket.send_text(text)
@@ -86,6 +97,21 @@ class ConnectionManager:
             del self._connections[connection.charger_id]
             return True
         return False
+
+    async def close_stale(self, timeout_s: float) -> None:
+        """關閉超過 timeout_s 沒有任何訊息的連線（TCP 半開時不會收到關閉通知）。
+
+        只關閉 socket；離線標記與事件由 endpoint 的接收迴圈結束時統一處理。
+        """
+        deadline = self._clock.now() - timedelta(seconds=timeout_s)
+        for connection in list(self._connections.values()):
+            if connection.last_seen < deadline:
+                logger.warning(
+                    "%s silent since %s, closing",
+                    connection.charger_id,
+                    connection.last_seen.isoformat(),
+                )
+                await connection.close()
 
     def is_online(self, charger_id: str) -> bool:
         return charger_id in self._connections

@@ -145,7 +145,7 @@ class ChargePointRouter:
             ctx.session, ctx.charger.id, req.id_tag, req.meter_start, req.timestamp
         )
         if created:
-            ctx.events.append(SessionStarted(ctx.charger.id, tx.id))
+            ctx.events.append(SessionStarted(ctx.charger.id, tx.id, tx.start_ts))
         return {"transactionId": tx.id, "idTagInfo": {"status": "Accepted"}}
 
     def _meter_values(self, ctx: HandlerContext, req: MeterValuesRequest):

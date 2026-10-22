@@ -11,4 +11,5 @@ class Settings:
     database_url: str = f"sqlite:///{PROJECT_ROOT / 'data' / 'chargeshare.db'}"
     config_dir: Path = PROJECT_ROOT / "config"
     heartbeat_interval_s: int = 60
+    snapshot_interval_s: int = 30
     power: PowerConfig = field(default_factory=PowerConfig)
