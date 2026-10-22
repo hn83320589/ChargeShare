@@ -189,3 +189,16 @@ def test_forged_admin_cookie_signed_with_public_string_is_rejected(client):
     client.cookies.set("session", forged)
     response = client.get("/admin", follow_redirects=False)
     assert response.status_code == 303
+
+
+def test_bill_detail_marks_cross_month_session(client, app):
+    with app.state.ctx.session_factory.begin() as session:
+        from sqlalchemy import select
+
+        tx = session.scalars(select(Transaction).where(Transaction.id_tag == "CARD-MINE")).one()
+        tx.start_ts = datetime(2026, 9, 30, 22, 0, tzinfo=TAIPEI)
+        tx.stop_ts = datetime(2026, 10, 1, 2, 0, tzinfo=TAIPEI)
+    login_resident(client)
+    page = client.get(f"/me/bills/{bill_id(app, 'A01-01')}").text
+    assert "跨月" in page
+    assert "歸入結束月份" in page

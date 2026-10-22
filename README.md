@@ -1,5 +1,9 @@
 # ChargeShare 社區充電樁共享管理平台
 
+[![CI](https://github.com/hn83320589/ChargeShare/actions/workflows/ci.yml/badge.svg)](https://github.com/hn83320589/ChargeShare/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue)
+
 一棟 120 戶的社區大樓，地下室有 8 支 7 kW 交流充電樁，但契約容量只撥 30 kW 給充電樁。
 ChargeShare 透過簡化版 OCPP 1.6J 控制每支樁的功率上限，確保總功率任何時刻都不超過 30 kW，
 並依二段式時間電價向住戶月結收費。充電樁韌體不穩、會斷線或重開機，系統以兩層去重與保守的額度保留處理。
@@ -18,6 +22,14 @@ ChargeShare 透過簡化版 OCPP 1.6J 控制每支樁的功率上限，確保總
 ```bash
 uv sync                      # 依 uv.lock 安裝鎖定版本的相依套件
 uv run chargeshare serve --dev   # 本機展示：啟動伺服器，首次啟動自動建立範例資料
+```
+
+不使用 uv 時，也可以用 pip 安裝（不會使用 `uv.lock` 的鎖定版本；`--group` 需要 pip 25.1 以上）：
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e . --group dev     # 只執行伺服器可省略 --group dev
+chargeshare serve --dev
 ```
 
 | 頁面 | 網址 | 範例帳號 |
@@ -227,7 +239,28 @@ CALLERROR   [4, "<messageId>", "<errorCode>", "<description>", {}]
 2. 第二階段送出**調升**。送出前以所有樁的持有上限重新驗算預算；若第一階段有調降失敗（例如剛好斷線），
    超出預算的調升會延後並排程重試。
 
-測試以「下達後 10 秒內舊值與新值都可能生效，取較大者」計算最壞情況的總和，驗證每個時間點 ≤ 30 kW。
+```mermaid
+sequenceDiagram
+    participant PM as PowerManager
+    participant A as CP01、CP02（快充滿）
+    participant B as CP03–CP08
+    Note over PM: 連續 2 筆讀數 < 上限 × 80% → 重新分配
+    PM->>A: SetChargingProfile 3.75 → 1.5 kW
+    A-->>PM: Accepted
+    Note over A: 10 秒內生效<br/>（這段期間舊值仍可能在用）
+    PM->>PM: 等 10 秒，並以持有上限重新驗算預算
+    PM->>B: SetChargingProfile 3.75 → 4.5 kW
+    B-->>PM: Accepted
+    Note over PM,B: 最壞情況：2 × 3.75 + 6 × 3.75 = 30 kW<br/>→ 2 × 1.5 + 6 × 4.5 = 30 kW
+```
+
+下圖是以真正的 PowerManager 跑同一個情境、記錄實際下達的指令，再以「下達後 10 秒內舊值與新值都可能生效，
+取較大者」計算每秒的最壞情況總功率。若同時下達調降與調升，最壞情況會到 34.5 kW，超過契約容量
+（產生方式：`uv run python scripts/two_phase_chart.py`）。
+
+![先降後升與同時下達的最壞情況總功率](docs/images/two-phase.svg)
+
+測試以同樣的方式計算最壞情況的總和，驗證每個時間點 ≤ 30 kW。
 
 ---
 
@@ -265,6 +298,7 @@ CALLERROR   [4, "<messageId>", "<errorCode>", "<description>", {}]
 - 帳單 P 包含所有「已結束、尚未入帳、且在 P 月底前結束」的交易，**跨月充電歸屬結束時間**所在月份。
 - 斷線樁在月結後才補送上月的 `StopTransaction` 時，該筆自動併入下一期，不會遺漏也不會重複。
 - 管委會可在「帳單」頁標記或取消已繳。
+- 帳單明細上，跨月的充電會標示「跨月」，說明依規定歸入結束月份。
 - **授權拒絕**：卡片停用，或該戶有任一張帳單**開立後超過 2 個日曆月**仍未繳（9/1 開立 → 11/2 起拒絕）。
 
 ---
@@ -368,7 +402,8 @@ uv run ruff check . && uv run ruff format --check .
 
 ```text
 config/                 tariff.toml、holidays_2026.toml
-docs/                   DESIGN.md、screenshots/
+docs/                   DESIGN.md、TEST_REPORT.md、screenshots/、images/
+scripts/                two_phase_chart.py（產生「先降後升」對照圖）
 src/chargeshare/
   clock.py              Clock 介面與 System / Fake / Scaled 實作
   domain/               allocation、demand、dispatch、tariff、metering、billing、auth_rules（純函數）
@@ -380,3 +415,9 @@ src/chargeshare/
   seed.py  runner.py  cli.py  app.py  settings.py
 tests/{unit,integration,e2e}/
 ```
+
+---
+
+## 授權
+
+[MIT License](LICENSE)

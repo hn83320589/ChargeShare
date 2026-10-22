@@ -6,6 +6,8 @@ authors = [
     { name = "DADA", email = "hn83320589@gmail.com" }
 ]
 requires-python = ">=3.12"
+license = "MIT"
+license-files = ["LICENSE"]
 dependencies = [
     "alembic>=1.20.1",
     "fastapi>=0.159.1",
@@ -47,6 +49,10 @@ exclude = ["*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# SVG 模板字串
+"scripts/*.py" = ["E501"]
 
 [tool.ruff.lint.flake8-bugbear]
 # FastAPI 以預設參數宣告相依注入

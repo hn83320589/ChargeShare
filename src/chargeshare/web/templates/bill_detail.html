@@ -15,6 +15,7 @@
       <tr>
         <td>{{ tx.start_ts | local_time }}</td>
         <td>{{ tx.stop_ts | local_time }}
+          {% if tx.crosses_month %}<span class="pill charging" title="跨月充電歸入結束月份的帳單">跨月</span>{% endif %}
           {% if tx.meter_resets %}<span class="pill unpaid" title="充電中途電表重置，已依分段累加計費">電表重置</span>{% endif %}</td>
         <td>{{ tx.charger_id }}</td>
         <td class="num">{{ (tx.peak_wh + tx.offpeak_wh) | kwh }}</td>
@@ -30,6 +31,7 @@
         <th class="num total">{{ "{:,}".format(bill.total_amount) }}</th></tr>
     </tfoot>
   </table>
-  <p class="muted">金額含每度 0.5 元管理費；度數計算到 0.001 度。</p>
+  <p class="muted">金額含每度 0.5 元管理費；度數計算到 0.001 度。
+    {% if bill.transactions | selectattr("crosses_month") | list %}標示「跨月」的充電依規定歸入結束月份的帳單。{% endif %}</p>
 </section>
 {% endblock %}
