@@ -4,6 +4,27 @@
 <script src="/static/dashboard.js" defer></script>{% endblock %}
 {% block nav %}<a href="/admin" class="active">儀表板</a><a href="/admin/bills">帳單</a><a href="/logout">登出</a>{% endblock %}
 {% block content %}
+{% if resets %}
+<section class="card notice">
+  <h2>待確認：電表重置</h2>
+  <p class="muted">充電樁在充電中途讀數下降（多為韌體重開機後電表歸零），系統已依分段累加計費。請確認度數合理後按「確認」。</p>
+  <table>
+    <thead><tr><th>樁</th><th>戶號</th><th>開始</th><th>結束</th><th class="num">重置次數</th><th class="num">計費度數</th><th></th></tr></thead>
+    <tbody>
+      {% for tx in resets %}
+      <tr>
+        <td>{{ tx.charger_id }}</td><td>{{ tx.household.unit_no }}</td>
+        <td>{{ tx.start_ts | local_time }}</td>
+        <td>{% if tx.stop_ts %}{{ tx.stop_ts | local_time }}{% else %}充電中{% endif %}</td>
+        <td class="num">{{ tx.meter_resets }}</td>
+        <td class="num">{{ ((tx.peak_wh or 0) + (tx.offpeak_wh or 0)) | kwh if tx.stop_ts else "—" }}</td>
+        <td><form method="post" action="/admin/transactions/{{ tx.id }}/confirm-reset"><button class="small secondary">確認</button></form></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
 <h1>充電樁狀態</h1>
 <div id="chargers" hx-get="/admin/chargers" hx-trigger="every 5s" hx-swap="innerHTML">
   {% include "admin/_chargers.html" %}

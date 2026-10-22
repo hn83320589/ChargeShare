@@ -171,12 +171,13 @@ def _report(result: FleetResult, problems: list[str], log: Path) -> int:
     result.recorder.write(log, result.monitor)
     for record in result.recorder.sessions:
         logger.info(
-            "%s tx %s：%.3f 度（重開機 %d 次、斷線 %d 次）",
+            "%s tx %s：%.3f 度（重開機 %d 次、斷線 %d 次、電表重置 %d 次）",
             record.charger_id,
             record.transaction_id,
             record.energy_wh / 1000,
             record.reboots,
             record.disconnects,
+            record.meter_resets,
         )
     return _print_problems(len(result.recorder.sessions), problems, result.monitor.peak_w)
 

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from chargeshare.db.models import Card, MeterSample, Transaction
 from chargeshare.domain.billing import price
-from chargeshare.domain.metering import Reading, split_energy
+from chargeshare.domain.metering import Reading, count_meter_resets, split_energy
 from chargeshare.domain.tariff import Tariff
 
 logger = logging.getLogger(__name__)
@@ -53,6 +53,17 @@ def record_meter_value(
     )
     if duplicate is not None:
         return None
+    previous = _reading_before(session, tx, ts)
+    if energy_wh < previous:
+        tx.meter_resets += 1
+        logger.warning(
+            "transaction %s: meter reset on %s (%s Wh → %s Wh at %s), needs review",
+            tx.id,
+            tx.charger_id,
+            previous,
+            energy_wh,
+            ts.isoformat(),
+        )
     sample = MeterSample(transaction=tx, ts=ts, energy_wh=energy_wh, power_w=power_w)
     session.add(sample)
     session.flush()
@@ -70,13 +81,17 @@ def stop_transaction(
     stop_ts: datetime,
     reason: str | None,
 ) -> bool:
-    """結束交易並計價；已結束的交易不再變更，回傳是否為本次結束。"""
+    """結束交易並計價；已結束的交易不再變更，回傳是否為本次結束。
+
+    meterStop 小於先前讀數時視為電表重置，照樣收下並分段累加計費，
+    不可回錯誤：CALLERROR 會讓樁無限重送，交易永遠無法結束。
+    """
     if not tx.is_active:
         return False
-    if stop_ts < tx.start_ts or meter_stop < tx.meter_start_wh:
+    if stop_ts < tx.start_ts:
         raise ValueError(
-            f"transaction {tx.id}: stop ({stop_ts.isoformat()}, {meter_stop} Wh) precedes "
-            f"start ({tx.start_ts.isoformat()}, {tx.meter_start_wh} Wh)"
+            f"transaction {tx.id}: stop time {stop_ts.isoformat()} "
+            f"precedes start {tx.start_ts.isoformat()}"
         )
     tx.stop_ts = stop_ts
     tx.meter_stop_wh = meter_stop
@@ -90,7 +105,33 @@ def _apply_charge(tx: Transaction, tariff: Tariff) -> None:
     readings = [Reading(tx.start_ts, tx.meter_start_wh)]
     readings += [Reading(s.ts, s.energy_wh) for s in tx.samples if tx.start_ts < s.ts < tx.stop_ts]
     readings.append(Reading(tx.stop_ts, tx.meter_stop_wh))
+    resets = count_meter_resets(readings)
+    if resets > tx.meter_resets:
+        logger.warning("transaction %s: %s meter reset(s), needs review", tx.id, resets)
+    tx.meter_resets = resets
     charge = price(split_energy(readings, tariff), tariff)
     tx.peak_wh = charge.peak_wh
     tx.offpeak_wh = charge.offpeak_wh
     tx.amount = charge.amount
+
+
+def _reading_before(session: Session, tx: Transaction, ts: datetime) -> int:
+    """ts 之前最近一筆讀數；沒有讀數時為 meterStart。"""
+    energy = session.scalar(
+        select(MeterSample.energy_wh)
+        .where(MeterSample.transaction_id == tx.id, MeterSample.ts < ts)
+        .order_by(MeterSample.ts.desc())
+        .limit(1)
+    )
+    return tx.meter_start_wh if energy is None else energy
+
+
+def confirm_meter_reset(session: Session, transaction_id: int, now: datetime) -> Transaction:
+    tx = session.get(Transaction, transaction_id)
+    if tx is None:
+        raise LookupError(f"transaction {transaction_id} not found")
+    if tx.meter_resets == 0:
+        raise ValueError(f"transaction {transaction_id} has no meter reset to confirm")
+    tx.reset_reviewed_at = now
+    session.flush()
+    return tx

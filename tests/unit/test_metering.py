@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from chargeshare.domain.metering import Reading, split_energy
+from chargeshare.domain.metering import Reading, count_meter_resets, split_energy
 from chargeshare.domain.tariff import Band, RatePeriod, Season
 from tests.conftest import tw
 
@@ -65,10 +65,31 @@ def test_single_reading_yields_no_energy(tariff):
     assert split_energy([Reading(tw(2026, 10, 22, 10, 0), 500)], tariff) == {}
 
 
-def test_decreasing_meter_fails_fast(tariff):
-    readings = [Reading(tw(2026, 10, 22, 10, 0), 5000), Reading(tw(2026, 10, 22, 10, 1), 4000)]
-    with pytest.raises(ValueError, match="decreased"):
-        split_energy(readings, tariff)
+def test_meter_reset_restarts_accumulation_from_new_reading(tariff):
+    # 1000 → 1100（+100）→ 重置後 50（+50）→ 150（+100）
+    readings = [
+        Reading(tw(2026, 10, 22, 10, 0), 1000),
+        Reading(tw(2026, 10, 22, 10, 1), 1100),
+        Reading(tw(2026, 10, 22, 10, 2), 50),
+        Reading(tw(2026, 10, 22, 10, 3), 150),
+    ]
+    assert sum(split_energy(readings, tariff).values()) == 250
+    assert count_meter_resets(readings) == 1
+
+
+def test_meter_reset_energy_is_attributed_to_its_own_interval(tariff):
+    # 重置發生在 08:30 → 09:30 的缺口內，重置後的 7000 Wh 依時間平分到離峰與尖峰
+    readings = [Reading(tw(2026, 7, 1, 8, 30), 900_000), Reading(tw(2026, 7, 1, 9, 30), 7000)]
+    split = split_energy(readings, tariff)
+    assert split == {
+        RatePeriod(Season.SUMMER, Band.OFFPEAK): 3500,
+        RatePeriod(Season.SUMMER, Band.PEAK): 3500,
+    }
+
+
+def test_no_reset_counted_for_monotonic_readings(tariff):
+    readings = [Reading(tw(2026, 10, 22, 10, m), 100 * m) for m in range(5)]
+    assert count_meter_resets(readings) == 0
 
 
 def test_same_timestamp_with_different_energy_fails_fast(tariff):

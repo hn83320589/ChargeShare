@@ -21,8 +21,12 @@ def test_verify_reports_energy_mismatch_and_missing(session):
     )
     session.add(tx)
     session.flush()
-    ok = SessionRecord("CP01", tx.id, "T", start.isoformat(), 100, start.isoformat(), 600)
-    wrong = SessionRecord("CP01", tx.id, "T", start.isoformat(), 100, start.isoformat(), 700)
+    ok = SessionRecord(
+        "CP01", tx.id, "T", start.isoformat(), 100, start.isoformat(), 600, reported_wh=500
+    )
+    wrong = SessionRecord(
+        "CP01", tx.id, "T", start.isoformat(), 100, start.isoformat(), 700, reported_wh=600
+    )
     missing = SessionRecord("CP02", 999, "T", start.isoformat(), 0, start.isoformat(), 1)
 
     assert verify([ok], session) == []

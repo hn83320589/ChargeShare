@@ -20,7 +20,8 @@ class Reading:
 def split_energy(readings: Iterable[Reading], tariff: Tariff) -> dict[RatePeriod, int]:
     """依相鄰讀數之間的時間比例，把電量線性分攤到各時段，回傳各時段的 Wh。
 
-    結果以最大餘數法取整數 Wh（= 0.001 度），保證加總等於電表差值。
+    讀數下降視為電表重置（見 segment_energy）。結果以最大餘數法取整數 Wh（= 0.001 度），
+    保證加總等於各段電量的總和。
     """
     ordered = sorted(readings, key=lambda r: r.ts)
     exact: dict[RatePeriod, Fraction] = defaultdict(Fraction)
@@ -28,7 +29,7 @@ def split_energy(readings: Iterable[Reading], tariff: Tariff) -> dict[RatePeriod
         _validate_pair(prev, cur)
         if cur.ts == prev.ts:
             continue
-        delta_wh = cur.energy_wh - prev.energy_wh
+        delta_wh = segment_energy(prev, cur)
         span = (cur.ts - prev.ts) // MICROSECOND
         t = prev.ts
         while t < cur.ts:
@@ -38,12 +39,25 @@ def split_energy(readings: Iterable[Reading], tariff: Tariff) -> dict[RatePeriod
     return _round_preserving_total(exact)
 
 
+def segment_energy(prev: Reading, cur: Reading) -> int:
+    """相鄰兩筆讀數之間的電量。
+
+    讀數下降代表電表重置（例如韌體重開機後從 0 起算）：重置後的電量就是新讀數本身。
+    重置前最後一筆讀數到實際歸零之間的電量無從得知，不計入。
+    """
+    if cur.energy_wh >= prev.energy_wh:
+        return cur.energy_wh - prev.energy_wh
+    return cur.energy_wh
+
+
+def count_meter_resets(readings: Iterable[Reading]) -> int:
+    ordered = sorted(readings, key=lambda r: r.ts)
+    return sum(
+        cur.energy_wh < prev.energy_wh for prev, cur in zip(ordered, ordered[1:], strict=False)
+    )
+
+
 def _validate_pair(prev: Reading, cur: Reading) -> None:
-    if cur.energy_wh < prev.energy_wh:
-        raise ValueError(
-            f"meter decreased from {prev.energy_wh} Wh at {prev.ts.isoformat()} "
-            f"to {cur.energy_wh} Wh at {cur.ts.isoformat()}"
-        )
     if cur.ts == prev.ts and cur.energy_wh != prev.energy_wh:
         raise ValueError(
             f"two readings at same timestamp {cur.ts.isoformat()} "

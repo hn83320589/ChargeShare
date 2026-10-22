@@ -88,3 +88,19 @@ async def test_fleet_of_eight_for_thirty_minutes(tmp_path, caplog):
     assert problems == []
     assert result.monitor.peak_w <= 30_000  # 驗收 12：實際總功率從未超過上限
     assert server_errors(caplog) == []
+
+
+async def test_meter_reset_on_reboot_is_billed_and_flagged(tmp_path, caplog):
+    # 審查回饋：不穩定韌體重開機後電表從 0 起算，交易仍須正常結束並計費
+    result, problems, app = await simulate(tmp_path, "meter-reset", minutes=12)
+    assert problems == []
+    [record] = [r for r in result.recorder.sessions if r.charger_id == "CP04"]
+    assert record.meter_resets == 1
+    assert record.meter_stop_wh < record.meter_start_wh  # 電表確實歸零過
+    with app.state.ctx.session_factory() as session:
+        tx = session.get(Transaction, record.transaction_id)
+        assert tx.stop_ts is not None
+        assert tx.peak_wh + tx.offpeak_wh == record.energy_wh > 0
+        assert tx.meter_resets == 1
+        assert tx.needs_review
+    assert server_errors(caplog) == []

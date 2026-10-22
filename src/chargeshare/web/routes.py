@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from chargeshare.db.models import Bill, BillingRun, Household, Transaction
 from chargeshare.security import verify_password
 from chargeshare.services.billing import set_bill_paid
+from chargeshare.services.transactions import confirm_meter_reset
 from chargeshare.web import views
 
 TEMPLATES = Jinja2Templates(directory=Path(__file__).parent / "templates")
@@ -104,8 +105,28 @@ def admin_dashboard(request: Request, session: Session = Depends(get_session)):
     context = {
         "chargers": views.charger_views(session, ctx.power),
         "capacity_kw": views.kw(ctx.settings.power.capacity_w),
+        "resets": session.scalars(
+            select(Transaction)
+            .where(Transaction.meter_resets > 0, Transaction.reset_reviewed_at.is_(None))
+            .order_by(Transaction.start_ts)
+        ).all(),
     }
     return TEMPLATES.TemplateResponse(request, "admin/dashboard.html", context)
+
+
+@router.post(
+    "/admin/transactions/{transaction_id}/confirm-reset", dependencies=[Depends(require_admin)]
+)
+def admin_confirm_reset(
+    request: Request, transaction_id: int, session: Session = Depends(get_session)
+):
+    try:
+        confirm_meter_reset(session, transaction_id, request.app.state.ctx.clock.now())
+    except LookupError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    return redirect("/admin")
 
 
 @router.get("/admin/chargers", response_class=HTMLResponse, dependencies=[Depends(require_admin)])

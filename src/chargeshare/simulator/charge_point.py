@@ -38,6 +38,7 @@ class Fault:
     kind: FaultKind
     at_s: float  # 模擬開始後幾秒發生
     duration_s: float
+    reset_meter: bool = False  # 重開機後電表從 0 起算（不穩定韌體）
 
 
 @dataclass(frozen=True)
@@ -248,8 +249,19 @@ class SimChargePoint:
         self._queue("StatusNotification", {"connectorId": 1, "status": "Charging"})
         self._update_power()
 
+    def _report_reading(self, energy_wh: int) -> None:
+        """記錄送出的讀數：依「讀數下降即電表重置」的規則累加應計費電量。"""
+        record = self._record
+        if energy_wh >= record.last_reading_wh:
+            record.reported_wh += energy_wh - record.last_reading_wh
+        else:
+            record.reported_wh += energy_wh
+            record.meter_resets += 1
+        record.last_reading_wh = energy_wh
+
     def _queue_meter_values(self) -> None:
         self._integrate()
+        self._report_reading(self.meter_wh)
         self._queue(
             "MeterValues",
             {
@@ -266,6 +278,7 @@ class SimChargePoint:
         self._state = _State.DONE
         self._record.stop = self._clock.now().isoformat()
         self._record.meter_stop_wh = self.meter_wh
+        self._report_reading(self.meter_wh)
         self._queue(
             "StopTransaction",
             {
@@ -310,6 +323,8 @@ class SimChargePoint:
                 self._limit_w = 0.0  # 重開機遺失伺服器下達的上限
                 self._applied_seq = self._profile_seq  # 尚未生效的設定一併遺失
                 self._update_power()
+                if fault.reset_meter:
+                    self._meter_wh = 0.0
             if self._ws is not None:
                 await self._ws.close()
             await self._clock.sleep(fault.duration_s)

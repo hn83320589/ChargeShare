@@ -65,6 +65,9 @@ class Transaction(Base):
     peak_wh: Mapped[int | None]
     offpeak_wh: Mapped[int | None]
     amount: Mapped[Decimal | None]  # 精確金額，帳單層才四捨五入
+    # 讀數下降（電表重置）的次數；大於 0 時需管委會確認
+    meter_resets: Mapped[int] = mapped_column(default=0, server_default="0")
+    reset_reviewed_at: Mapped[datetime | None]
     bill_id: Mapped[int | None] = mapped_column(ForeignKey("bills.id"), index=True)
 
     charger: Mapped[Charger] = relationship()
@@ -77,6 +80,17 @@ class Transaction(Base):
     @property
     def is_active(self) -> bool:
         return self.stop_ts is None
+
+    @property
+    def needs_review(self) -> bool:
+        return self.meter_resets > 0 and self.reset_reviewed_at is None
+
+    @property
+    def crosses_month(self) -> bool:
+        return self.stop_ts is not None and (self.start_ts.year, self.start_ts.month) != (
+            self.stop_ts.year,
+            self.stop_ts.month,
+        )
 
 
 class MeterSample(Base):

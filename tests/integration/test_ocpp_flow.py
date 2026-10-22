@@ -207,3 +207,32 @@ def test_server_sends_charging_profile_after_start(client):
         start(cp)
         cp.call("Heartbeat", {})
     assert ("SetChargingProfile", {"connectorId": 1, "limitW": 7000}) in cp.server_calls
+
+
+def test_meter_reset_mid_charge_is_accumulated_and_flagged(client, app):
+    # 樁重開機後電表從 0 開始：1,111,213 → 1,111,330 → 重置 → 4 → 56 → 364 → 停止 400
+    # 分段累加：117 + 4 + 52 + 308 + 36 = 517 Wh
+    with connect(client) as ws:
+        cp = FakeChargePoint(ws)
+        tx_id = start(cp, meter_start=1_111_213)["transactionId"]
+        for minute, energy in [(1, 1_111_330), (2, 4), (3, 56), (5, 364)]:
+            assert meter(cp, tx_id, minute, energy) == {}
+        assert stop(cp, tx_id, 6, 400) == {}
+    tx = load_tx(app, tx_id)
+    assert tx.stop_ts is not None
+    assert tx.peak_wh + tx.offpeak_wh == 517
+    assert tx.amount is not None
+    assert tx.meter_resets == 1
+    assert tx.needs_review
+
+
+def test_meter_reset_right_before_stop_is_accepted(client, app):
+    # 重置後還沒送出任何讀數就結束：100 + 30 = 130 Wh
+    with connect(client) as ws:
+        cp = FakeChargePoint(ws)
+        tx_id = start(cp, meter_start=5_000)["transactionId"]
+        meter(cp, tx_id, 1, 5_100)
+        assert stop(cp, tx_id, 2, 30) == {}
+    tx = load_tx(app, tx_id)
+    assert tx.peak_wh + tx.offpeak_wh == 130
+    assert tx.meter_resets == 1

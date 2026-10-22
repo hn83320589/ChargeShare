@@ -145,3 +145,33 @@ def test_power_api_returns_last_hour_with_capacity(client):
     measured = [point["measured_w"] for point in data["points"]]
     assert measured[:2] == [20_030, 20_001]  # 90 分鐘前的點不在範圍內
     assert data["points"][-1]["ts"] == NOW.isoformat()  # 最後一點為即時值
+
+
+def test_admin_confirms_meter_reset(client, app):
+    with app.state.ctx.session_factory.begin() as session:
+        from sqlalchemy import select
+
+        tx = session.scalars(select(Transaction).where(Transaction.id_tag == "CARD-OTHER")).one()
+        tx.meter_resets = 1
+        tx_id = tx.id
+    login_admin(client)
+    dashboard = client.get("/admin").text
+    assert "待確認：電表重置" in dashboard
+    assert f"/admin/transactions/{tx_id}/confirm-reset" in dashboard
+
+    response = client.post(f"/admin/transactions/{tx_id}/confirm-reset", follow_redirects=False)
+    assert response.status_code == 303
+    with app.state.ctx.session_factory() as session:
+        assert session.get(Transaction, tx_id).reset_reviewed_at == NOW
+    assert "待確認：電表重置" not in client.get("/admin").text
+
+
+def test_bill_detail_marks_meter_reset(client, app):
+    with app.state.ctx.session_factory.begin() as session:
+        from sqlalchemy import select
+
+        session.scalars(
+            select(Transaction).where(Transaction.id_tag == "CARD-MINE")
+        ).one().meter_resets = 1
+    login_resident(client)
+    assert "電表重置" in client.get(f"/me/bills/{bill_id(app, 'A01-01')}").text

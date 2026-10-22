@@ -21,12 +21,20 @@ class SessionRecord:
     meter_stop_wh: int | None = None
     reboots: int = 0
     disconnects: int = 0
+    meter_resets: int = 0
+    # 依送出的讀數累加（讀數下降視為電表重置），即伺服器應計費的電量
+    reported_wh: int = 0
+    last_reading_wh: int = -1
+
+    def __post_init__(self) -> None:
+        if self.last_reading_wh < 0:
+            self.last_reading_wh = self.meter_start_wh
 
     @property
     def energy_wh(self) -> int:
         if self.meter_stop_wh is None:
             raise ValueError(f"session {self.transaction_id} on {self.charger_id} never stopped")
-        return self.meter_stop_wh - self.meter_start_wh
+        return self.reported_wh
 
 
 class FleetMonitor:

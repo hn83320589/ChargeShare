@@ -13,7 +13,10 @@
     <tbody>
       {% for tx in bill.transactions %}
       <tr>
-        <td>{{ tx.start_ts | local_time }}</td><td>{{ tx.stop_ts | local_time }}</td><td>{{ tx.charger_id }}</td>
+        <td>{{ tx.start_ts | local_time }}</td>
+        <td>{{ tx.stop_ts | local_time }}
+          {% if tx.meter_resets %}<span class="pill unpaid" title="充電中途電表重置，已依分段累加計費">電表重置</span>{% endif %}</td>
+        <td>{{ tx.charger_id }}</td>
         <td class="num">{{ (tx.peak_wh + tx.offpeak_wh) | kwh }}</td>
         <td class="num">{{ tx.peak_wh | kwh }}</td><td class="num">{{ tx.offpeak_wh | kwh }}</td>
         <td class="num">{{ tx.amount | money }}</td>

@@ -13,11 +13,12 @@ from chargeshare.simulator.charge_point import (
 )
 from chargeshare.simulator.recorder import FleetMonitor, Recorder
 
-SCENARIOS = ("normal", "taper", "disconnect", "reboot", "all")
+SCENARIOS = ("normal", "taper", "disconnect", "reboot", "meter-reset", "all")
 
 TAPER_CHARGERS = ("CP01", "CP02")  # 插電混合車小電池、接近充滿
 DISCONNECT = Fault(FaultKind.DISCONNECT, at_s=5 * 60, duration_s=10 * 60)
 REBOOT = Fault(FaultKind.REBOOT, at_s=5 * 60, duration_s=60)
+REBOOT_WITH_METER_RESET = Fault(FaultKind.REBOOT, at_s=5 * 60, duration_s=60, reset_meter=True)
 
 
 @dataclass(frozen=True)
@@ -55,6 +56,8 @@ def build_fleet(
             faults.append(DISCONNECT)
         if charger_id == "CP04" and options.scenario in ("reboot", "all"):
             faults.append(REBOOT)
+        if charger_id == "CP04" and options.scenario == "meter-reset":
+            faults.append(REBOOT_WITH_METER_RESET)
         fleet.append(
             SimChargePoint(
                 charger_id,
