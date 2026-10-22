@@ -58,3 +58,18 @@ def test_seed_includes_authorization_demos(session):
     assert authorize_id_tag(session, card_id(1, 1, 1), later).status == AuthStatus.ACCEPTED
     unpaid = session.scalars(select(Bill).where(Bill.paid_at.is_(None))).all()
     assert {b.household.unit_no for b in unpaid if b.period == "2026-07"} == set(OVERDUE_DEMO_UNITS)
+
+
+def test_store_handles_session_with_single_reading(session, tariff):
+    # 在「現在」前 1 分鐘才開始的充電只有結束讀數，沒有中間讀數可批次寫入
+    from chargeshare.seed import _Session, _store, seed_base
+
+    seed_base(session, hasher=lambda p: "x")
+    household = session.scalars(select(Household)).first()
+    start = tw(2026, 10, 22, 21, 29)
+    one_minute = _Session(household.id, "RFID-0101-1", "CP01", start, 5_000, 1_000.0)
+    one_minute.samples.append((tw(2026, 10, 22, 21, 30), 1_116, 7_000))
+    one_minute.stop = tw(2026, 10, 22, 21, 30)
+    _store(session, tariff, [one_minute])
+    tx = session.scalars(select(Transaction)).one()
+    assert tx.peak_wh + tx.offpeak_wh == 116

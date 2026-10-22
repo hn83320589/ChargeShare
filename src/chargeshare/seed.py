@@ -238,10 +238,9 @@ def _store(session: Session, tariff: Tariff, sessions: list[_Session]) -> None:
         )
         session.add(tx)
         session.flush()
-        session.execute(
-            insert(MeterSample),
-            [
-                {"transaction_id": tx.id, "ts": ts, "energy_wh": energy, "power_w": power_w}
-                for ts, energy, power_w in s.samples[:-1]
-            ],
-        )
+        rows = [
+            {"transaction_id": tx.id, "ts": ts, "energy_wh": energy, "power_w": power_w}
+            for ts, energy, power_w in s.samples[:-1]
+        ]
+        if rows:  # 空串列會讓 SQLAlchemy 產生 INSERT ... DEFAULT VALUES
+            session.execute(insert(MeterSample), rows)
