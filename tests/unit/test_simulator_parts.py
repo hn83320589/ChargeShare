@@ -49,3 +49,39 @@ async def test_sender_retrieves_failed_future_when_connection_drops_mid_send(cap
     gc.collect()
     assert "never retrieved" not in caplog.text
     assert cp._waiting == {}
+
+
+async def test_faults_are_timed_from_charging_start_not_simulation_start():
+    # CI 偶發：機器慢時充電晚開始，以模擬開始計時的重開機會發生在充電之前
+    import asyncio
+    from datetime import datetime
+
+    from chargeshare.clock import TAIPEI, FakeClock
+    from chargeshare.simulator.charge_point import (
+        Fault,
+        FaultKind,
+        SessionPlan,
+        SimChargePoint,
+        _State,
+    )
+    from chargeshare.simulator.recorder import FleetMonitor, Recorder, SessionRecord
+
+    clock = FakeClock(datetime(2026, 10, 22, 18, 0, tzinfo=TAIPEI))
+    plan = SessionPlan("RFID-0104-1", plug_in_at_s=60, battery_wh=60_000, initial_soc=0.2)
+    reboot = Fault(FaultKind.REBOOT, at_s=300, duration_s=60)
+    cp = SimChargePoint("CP04", "ws://unused", clock, Recorder(), FleetMonitor(), plan, [reboot])
+    faults = asyncio.create_task(cp._fault_loop())
+
+    await clock.advance(400)  # 已超過模擬開始後 300 秒，但還沒開始充電
+    assert not cp._rebooting
+
+    cp._record = SessionRecord("CP04", 1, "RFID-0104-1", clock.now().isoformat(), 0)
+    cp._state = _State.CHARGING
+    cp._charging_since = clock.now()
+    await clock.advance(299)
+    assert not cp._rebooting
+    await clock.advance(2)
+    assert cp._rebooting
+    assert cp._record.reboots == 1
+    faults.cancel()
+    await asyncio.gather(faults, return_exceptions=True)

@@ -14,7 +14,7 @@ import random
 import uuid
 from collections import deque
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from enum import StrEnum
 from typing import Any
 
@@ -36,7 +36,7 @@ class FaultKind(StrEnum):
 @dataclass(frozen=True)
 class Fault:
     kind: FaultKind
-    at_s: float  # 模擬開始後幾秒發生
+    at_s: float  # 開始充電後幾秒發生（保證在充電途中，不受機器快慢影響）
     duration_s: float
     reset_meter: bool = False  # 重開機後電表從 0 起算（不穩定韌體）
 
@@ -119,7 +119,7 @@ class SimChargePoint:
         self._record: SessionRecord | None = None
         self._transaction_id: int | None = None
         self._started = clock.now()
-        self._stopping = False
+        self._charging_since: datetime | None = None
 
     # ── 對外 ───────────────────────────────────────────────────────
 
@@ -246,6 +246,7 @@ class SimChargePoint:
             )
         )
         self._state = _State.CHARGING
+        self._charging_since = self._clock.now()
         self._queue("StatusNotification", {"connectorId": 1, "status": "Charging"})
         self._update_power()
 
@@ -309,8 +310,11 @@ class SimChargePoint:
     # ── 故障情境 ───────────────────────────────────────────────────
 
     async def _fault_loop(self) -> None:
+        while self._charging_since is None:
+            await self._clock.sleep(1)
         for fault in self._faults:
-            await self._clock.sleep(max(0.0, fault.at_s - self._elapsed()))
+            since_charging = (self._clock.now() - self._charging_since).total_seconds()
+            await self._clock.sleep(max(0.0, fault.at_s - since_charging))
             logger.info("%s %s for %ss", self.charger_id, fault.kind, fault.duration_s)
             if self._record is not None:
                 if fault.kind == FaultKind.REBOOT:
